@@ -1,0 +1,61 @@
+### ─────────────────────────────────────────────────────────────────────────
+### AI KEY STATUS — Test OpenAI Chat + Embeddings connectivity
+###
+### Run this FIRST before testing anything else.
+###
+### Expected when key is set and working:
+###   "openai_chat":       { "status": "reachable", "testReply": "OK", "latencyMs": 800 }
+###   "openai_embeddings": { "status": "reachable", "dimensions": 1536 }
+###
+### Expected when key is missing:
+###   "openai_chat":       { "status": "not_configured", "hint": "Set OPENAI_API_KEY..." }
+###   "openai_embeddings": { "status": "not_configured" }
+###
+### Expected when key is wrong / expired:
+###   "openai_chat":       { "status": "error", "error": "401 Unauthorized" }
+### ─────────────────────────────────────────────────────────────────────────
+
+
+### Test OpenAI Chat + Embeddings
+GET {{baseUrl}}/admin/ai/status
+Accept: application/json
+
+> {%
+  var chat = response.body.openai_chat;
+  var emb  = response.body.openai_embeddings;
+
+  client.log("──────────────────────────────────────");
+  client.log("AI STATUS CHECK");
+  client.log("──────────────────────────────────────");
+
+  client.log("OpenAI Chat (gpt-4o-mini):");
+  client.log("  configured : " + chat.configured);
+  client.log("  status     : " + chat.status);
+  if (chat.testReply)  client.log("  test reply : " + chat.testReply);
+  if (chat.latencyMs)  client.log("  latency    : " + chat.latencyMs + "ms");
+  if (chat.error)      client.log("  !! ERROR   : " + chat.error);
+  if (chat.hint)       client.log("  hint       : " + chat.hint);
+
+  client.log("");
+  client.log("OpenAI Embeddings (text-embedding-3-small):");
+  client.log("  configured : " + emb.configured);
+  client.log("  status     : " + emb.status);
+  if (emb.dimensions)  client.log("  dimensions : " + emb.dimensions);
+  if (emb.latencyMs)   client.log("  latency    : " + emb.latencyMs + "ms");
+  if (emb.error)       client.log("  !! ERROR   : " + emb.error);
+  if (emb.hint)        client.log("  hint       : " + emb.hint);
+
+  client.log("──────────────────────────────────────");
+
+  if (chat.status === "reachable") {
+    client.log("✓ Chat ready  — mock interviews, scoring, chatbot will work");
+  } else {
+    client.log("✗ Chat not ready — AI features will return stub responses");
+  }
+
+  if (emb.status === "reachable") {
+    client.log("✓ Embeddings ready — semantic document search is active");
+  } else {
+    client.log("~ Embeddings not active — keyword search used instead");
+  }
+%}

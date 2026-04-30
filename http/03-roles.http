@@ -1,0 +1,34 @@
+### ─────────────────────────────────────────────────────────────────────────
+### ROLES
+### Base: {{baseUrl}}/roles
+### ─────────────────────────────────────────────────────────────────────────
+
+
+### List ALL roles (across all accounts)
+GET {{baseUrl}}/roles
+Accept: application/json
+
+> {%
+  var roles = response.body;
+  if (roles.length > 0) {
+    client.global.set("roleId", roles[0].id);
+    client.log("Captured roleId: " + roles[0].id);
+  }
+%}
+
+
+###
+
+
+### List roles for a specific account
+# Requires accountId — run 01-accounts.http first to capture one
+GET {{baseUrl}}/roles?accountId={{accountId}}
+Accept: application/json
+
+
+###
+
+
+### Delete a role (admin only)
+DELETE {{baseUrl}}/roles/{{roleId}}
+X-Admin-Key: {{adminKey}}

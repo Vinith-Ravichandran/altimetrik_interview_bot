@@ -1,0 +1,107 @@
+### ─────────────────────────────────────────────────────────────────────────
+### USERS  (AppUser — backend user management)
+### Base: {{baseUrl}}/users
+### Mutations require X-Admin-Key header
+### ─────────────────────────────────────────────────────────────────────────
+
+GET http://localhost:8080/api/v1/users
+
+
+# Create a user (requires admin key header)
+POST http://localhost:8080/api/v1/users
+Headers: X-Admin-Key: interview-admin-secret
+Body: { "name": "john", "password": "secret", "roleName": "CANDIDATE", "accountName": "Acme", "admin": false }
+
+# Delete a user
+DELETE http://localhost:8080/api/v1/users/{id}
+Headers: X-Admin-Key: interview-admin-secret
+
+### List all users
+GET {{baseUrl}}/users
+Accept: application/json
+
+> {%
+  var users = response.body;
+  if (users.length > 0) {
+    client.global.set("userId", users[0].id);
+    client.log("Captured userId: " + users[0].id);
+  }
+%}
+
+
+###
+
+
+### Get a single user by ID
+GET {{baseUrl}}/users/{{userId}}
+Accept: application/json
+
+
+###
+
+
+### Get user performance stats
+# Returns: mockCount, avgScore, highestScore, realInterviews, lastActivity
+GET {{baseUrl}}/users/{{userId}}/stats
+Accept: application/json
+
+
+###
+
+
+### Create a regular user (admin only)
+POST http://localhost:8080/users
+Content-Type: application/json
+X-Admin-Key: interview-admin-secret
+
+{
+  "name": "Vinith Kumar",
+  "password": "password",
+  "roleName": "Data Engineer",
+  "accountName": "PayPal",
+  "admin": false
+}
+
+> {%
+  client.global.set("userId", response.body.id);
+  client.log("Created user: " + response.body.name + " | id: " + response.body.id);
+%}
+
+
+###
+
+
+### Create an admin user (admin only)
+POST {{baseUrl}}/users
+Content-Type: application/json
+X-Admin-Key: {{adminKey}}
+
+{
+  "name": "Arun Prakash",
+  "password": "admin",
+  "roleName": "Platform Admin",
+  "accountName": "",
+  "admin": true
+}
+
+
+###
+
+
+### Update user role and account assignment (admin only)
+PATCH {{baseUrl}}/users/{{userId}}
+Content-Type: application/json
+X-Admin-Key: {{adminKey}}
+
+{
+  "roleName": "Senior Data Engineer",
+  "accountName": "Ford"
+}
+
+
+###
+
+
+### Delete a user (admin only)
+DELETE {{baseUrl}}/users/{{userId}}
+X-Admin-Key: {{adminKey}}

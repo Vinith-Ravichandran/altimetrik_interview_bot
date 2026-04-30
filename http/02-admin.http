@@ -1,0 +1,90 @@
+### ─────────────────────────────────────────────────────────────────────────
+### ADMIN — Account+Roles creation + Dashboard analytics
+### All endpoints require X-Admin-Key header
+### ─────────────────────────────────────────────────────────────────────────
+
+
+### Create account WITH roles in one atomic call (admin only)
+POST {{baseUrl}}/admin/accounts-with-roles
+Content-Type: application/json
+X-Admin-Key: {{adminKey}}
+
+{
+  "accountName": "PayPal",
+  "logoUrl": "https://logo.clearbit.com/paypal.com",
+  "roles": [
+    "Data Engineer",
+    "Software Engineer",
+    "Backend Developer"
+  ]
+}
+
+> {%
+  client.global.set("accountId", response.body.id);
+  client.log("Created account: " + response.body.name + " | id: " + response.body.id);
+%}
+
+
+###
+
+
+### Create another account — Ford
+POST {{baseUrl}}/admin/accounts-with-roles
+Content-Type: application/json
+X-Admin-Key: {{adminKey}}
+
+{
+  "accountName": "Ford",
+  "logoUrl": "https://logo.clearbit.com/ford.com",
+  "roles": [
+    "Data Engineer",
+    "DevOps Engineer",
+    "Frontend Developer"
+  ]
+}
+
+
+###
+
+
+### Create another account — Google
+POST {{baseUrl}}/admin/accounts-with-roles
+Content-Type: application/json
+X-Admin-Key: {{adminKey}}
+
+{
+  "accountName": "Google",
+  "logoUrl": "https://logo.clearbit.com/google.com",
+  "roles": [
+    "Data Scientist",
+    "Software Engineer",
+    "ML Engineer"
+  ]
+}
+
+
+###
+
+
+### Dashboard — KPI summary
+GET {{baseUrl}}/admin/dashboard/summary
+X-Admin-Key: {{adminKey}}
+Accept: application/json
+
+
+###
+
+
+### Dashboard — Sessions by week (last 8 weeks)
+GET {{baseUrl}}/admin/dashboard/sessions-by-week
+X-Admin-Key: {{adminKey}}
+Accept: application/json
+
+
+###
+
+
+### Dashboard — All users' performance (for admin table)
+GET {{baseUrl}}/admin/dashboard/users/performance
+X-Admin-Key: {{adminKey}}
+Accept: application/json

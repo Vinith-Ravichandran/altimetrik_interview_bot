@@ -1,0 +1,66 @@
+### ─────────────────────────────────────────────────────────────────────────
+### POST INTERVIEW (Real Interview Logs)
+### Base: {{baseUrl}}/real-interviews
+###
+### Flow:
+###   1. POST /real-interviews → log questions from a real interview
+###      Claude classifies each question by domain, service, difficulty
+###   2. GET  /real-interviews → review all logged interviews
+###
+### Requires CLAUDE_API_KEY for question classification.
+### ─────────────────────────────────────────────────────────────────────────
+
+
+### List all logged real interviews
+GET {{baseUrl}}/real-interviews
+Accept: application/json
+
+
+###
+
+
+### Log a real interview — Data Engineer at PayPal
+# accountId must exist in the backend (run 02-admin.http first)
+POST {{baseUrl}}/real-interviews
+Content-Type: application/json
+
+{
+  "accountId": "{{accountId}}",
+  "panelistName": "John Smith, Senior Data Engineer",
+  "questions": [
+    "Explain the difference between RANK and DENSE_RANK in SQL.",
+    "How would you design a data pipeline that ingests 10TB of data daily?",
+    "What is the difference between a data warehouse and a data lake?",
+    "How does Apache Spark handle data shuffling and what are the performance implications?",
+    "Describe a situation where you had to optimize a slow SQL query."
+  ]
+}
+
+> {%
+  client.global.set("realInterviewLogId", response.body.id);
+  client.log("Logged real interview: " + response.body.id);
+  client.log("Questions classified: " + response.body.questions.length);
+  response.body.questions.forEach(function(q) {
+    client.log("  [" + q.difficulty + "] " + q.domain + " → " + q.service + ": " + q.text.substring(0, 60));
+  });
+%}
+
+
+###
+
+
+### Log a real interview — Software Engineer at Google
+POST {{baseUrl}}/real-interviews
+Content-Type: application/json
+
+{
+  "accountId": "{{accountId}}",
+  "panelistName": "Sarah Lee, Staff Engineer",
+  "questions": [
+    "Implement a LRU cache in Java.",
+    "Explain the CAP theorem and when you would choose CP vs AP.",
+    "How would you design a URL shortening service like bit.ly?",
+    "What is the time complexity of merging two sorted linked lists?",
+    "Explain the difference between optimistic and pessimistic locking."
+  ]
+}

@@ -1,0 +1,100 @@
+### ─────────────────────────────────────────────────────────────────────────
+### STUDY MATERIAL (Documents)
+### Base: {{baseUrl}}/documents
+###
+### Upload accepts: PDF, DOCX, DOC, TXT, PPT, PPTX, XLS, XLSX
+### Files are saved to ./uploads on the server filesystem
+### Text is extracted with Apache Tika
+### Claude categorises and tags (if CLAUDE_API_KEY is set)
+### Chunks are embedded with Voyage AI (if VOYAGE_API_KEY is set)
+### ─────────────────────────────────────────────────────────────────────────
+
+
+### List all documents
+GET {{baseUrl}}/documents
+Accept: application/json
+
+> {%
+  var docs = response.body;
+  if (docs.length > 0) {
+    client.global.set("documentId", docs[0].id);
+    client.log("Captured documentId: " + docs[0].id);
+  }
+%}
+
+
+###
+
+
+### Get a single document by ID
+GET {{baseUrl}}/documents/{{documentId}}
+Accept: application/json
+
+
+###
+
+
+### Upload a file — no account/role tag
+# Change the file path to an actual file on your machine
+POST {{baseUrl}}/documents
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="file"; filename="sample.txt"
+Content-Type: text/plain
+
+This is sample study material about SQL queries and data engineering.
+BigQuery, Spark, ETL pipelines, data warehousing concepts.
+--boundary--
+
+> {%
+  client.global.set("documentId", response.body.id);
+  client.log("Uploaded document: " + response.body.filename + " | id: " + response.body.id);
+%}
+
+
+###
+
+
+### Upload a file — tagged with account and role
+POST {{baseUrl}}/documents?accountName=PayPal&roleName=Data%20Engineer
+Content-Type: multipart/form-data; boundary=boundary2
+
+--boundary2
+Content-Disposition: form-data; name="file"; filename="paypal-de-notes.txt"
+Content-Type: text/plain
+
+PayPal Data Engineering Interview Notes:
+- SQL window functions
+- Apache Kafka streaming
+- Data pipeline design patterns
+- Python pandas and PySpark
+--boundary2--
+
+> {%
+  client.global.set("documentId", response.body.id);
+  client.log("Uploaded tagged document: " + response.body.id);
+%}
+
+
+###
+
+
+### Export document as PDF (download link)
+GET {{baseUrl}}/documents/{{documentId}}/export?format=pdf
+Accept: application/pdf
+
+
+###
+
+
+### Export document as DOCX (download link)
+GET {{baseUrl}}/documents/{{documentId}}/export?format=docx
+Accept: application/vnd.openxmlformats-officedocument.wordprocessingml.document
+
+
+###
+
+
+### Delete a document
+DELETE {{baseUrl}}/documents/{{documentId}}

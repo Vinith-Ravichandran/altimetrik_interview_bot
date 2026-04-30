@@ -1,0 +1,97 @@
+# ============================================================
+#  .gitignore — Interview Prep Platform
+#  RULE: If a file contains real credentials, it goes here.
+# ============================================================
+
+
+# ── Secret / credential files (NEVER commit these) ───────────
+.env
+.env.example
+.env.*.local
+*.env
+!*.env.example          # .env.example files ARE committed (templates only)
+
+backend/.env
+frontend/.env
+
+# HTTP client env (contains tokens / keys used during API testing)
+http/http-client.env.json
+
+
+# ── H2 local database files ──────────────────────────────────
+data/
+*.mv.db
+*.trace.db
+
+
+# ── Java / Maven build output ─────────────────────────────────
+backend/target/
+*.class
+*.jar
+*.war
+*.ear
+*.log
+hs_err_pid*
+
+
+# ── IDE project files ─────────────────────────────────────────
+.idea/
+*.iml
+*.ipr
+*.iws
+backend/.idea/
+backend/*.iml
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+
+# ── Frontend build & dependencies ─────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+
+# ── Uploaded files (runtime data, not source) ─────────────────
+uploads/
+backend/uploads/
+
+
+# ── OS generated ──────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+
+# ── Logs ──────────────────────────────────────────────────────
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+
+# ── Temp / test artifacts ─────────────────────────────────────
+*.tmp
+*.bak
+*.swp
+coverage/
+.nyc_output/
+
+
+# ── Claude Code local config ──────────────────────────────────
+.claude/
+
+
+# ── TypeScript / Vite build info ──────────────────────────────
+*.tsbuildinfo
+frontend/vite.config.d.ts
+frontend/vite.config.js

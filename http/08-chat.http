@@ -1,0 +1,110 @@
+### ─────────────────────────────────────────────────────────────────────────
+### CHATBOT ASSISTANT
+### Base: {{baseUrl}}/chat
+###
+### The chatbot:
+###   1. Detects intent: VECTOR_SEARCH (find in study materials) or GENERAL
+###   2. For VECTOR_SEARCH: finds relevant document chunks using pgvector
+###      (falls back to keyword search if embeddings not set up)
+###   3. Calls Claude to generate a natural language answer
+###   4. Persists conversation in chat_sessions / chat_messages tables
+###
+### To continue a conversation, pass the sessionId from the previous response.
+### Omit sessionId to start a new conversation.
+###
+### Requires CLAUDE_API_KEY for AI responses.
+### ─────────────────────────────────────────────────────────────────────────
+
+
+### Start a new chat — general question
+POST {{baseUrl}}/chat
+Content-Type: application/json
+
+{
+  "message": "What is this platform about and how can it help me prepare for interviews?"
+}
+
+> {%
+  client.global.set("chatSessionId", response.body.sessionId);
+  client.log("Chat session started: " + response.body.sessionId);
+  client.log("Intent: " + response.body.intent);
+  client.log("Reply: " + response.body.reply.substring(0, 200));
+%}
+
+
+###
+
+
+### Continue conversation — ask about study materials
+# Uses the chatSessionId captured above to maintain conversation history
+POST {{baseUrl}}/chat
+Content-Type: application/json
+
+{
+  "sessionId": "{{chatSessionId}}",
+  "message": "What topics are covered in the study materials I've uploaded?"
+}
+
+> {%
+  client.log("Intent: " + response.body.intent);
+  client.log("Sources used: " + JSON.stringify(response.body.sources));
+  client.log("Reply: " + response.body.reply.substring(0, 300));
+%}
+
+
+###
+
+
+### Ask a technical question — triggers VECTOR_SEARCH
+POST {{baseUrl}}/chat
+Content-Type: application/json
+
+{
+  "sessionId": "{{chatSessionId}}",
+  "message": "Explain SQL window functions and give me examples for interview preparation."
+}
+
+
+###
+
+
+### Ask about a specific topic — triggers VECTOR_SEARCH
+POST {{baseUrl}}/chat
+Content-Type: application/json
+
+{
+  "sessionId": "{{chatSessionId}}",
+  "message": "What should I know about Apache Spark for a Data Engineer interview at PayPal?"
+}
+
+
+###
+
+
+### Start a fresh chat session linked to a user
+POST {{baseUrl}}/chat
+Content-Type: application/json
+
+{
+  "userId": "{{userId}}",
+  "message": "I have an interview at Ford next week as a Data Engineer. What topics should I focus on?"
+}
+
+> {%
+  client.global.set("chatSessionId", response.body.sessionId);
+  client.log("New session: " + response.body.sessionId);
+  client.log("Reply: " + response.body.reply.substring(0, 300));
+%}
+
+
+###
+
+
+### Ask for performance feedback
+POST {{baseUrl}}/chat
+Content-Type: application/json
+
+{
+  "sessionId": "{{chatSessionId}}",
+  "message": "Based on typical interview patterns, what are the most common weaknesses candidates show in data engineering interviews?"
+}

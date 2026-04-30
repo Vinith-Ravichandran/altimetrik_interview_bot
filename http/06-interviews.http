@@ -1,0 +1,111 @@
+### ─────────────────────────────────────────────────────────────────────────
+### MOCK INTERVIEWS
+### Base: {{baseUrl}}/interviews
+###
+### Flow:
+###   1. POST /interviews          → start session (generates first question)
+###   2. POST /questions/{id}/answer → submit answer (AI evaluates it)
+###   3. POST /{id}/next-question  → get next question
+###   4. Repeat 2-3 as needed
+###   5. POST /{id}/finish         → get overall score + feedback
+###
+### Requires CLAUDE_API_KEY for AI question generation and evaluation.
+### ─────────────────────────────────────────────────────────────────────────
+
+
+### List all interview sessions
+GET {{baseUrl}}/interviews
+Accept: application/json
+
+
+###
+
+
+### Start a new interview session
+# Requires valid accountId and roleId — run 01-accounts.http and 03-roles.http first
+POST {{baseUrl}}/interviews
+Content-Type: application/json
+
+{
+  "accountId": "{{accountId}}",
+  "roleId": "{{roleId}}",
+  "userId": "{{userId}}"
+}
+
+> {%
+  client.global.set("sessionId", response.body.id);
+  var questions = response.body.questions;
+  if (questions && questions.length > 0) {
+    client.global.set("questionId", questions[0].id);
+    client.log("Session started: " + response.body.id);
+    client.log("First question: " + questions[0].text);
+    client.log("Question ID: " + questions[0].id);
+  }
+%}
+
+
+###
+
+
+### Get full session details (questions + answers + evaluations)
+GET {{baseUrl}}/interviews/{{sessionId}}
+Accept: application/json
+
+
+###
+
+
+### Submit an answer to the current question
+# questionId is captured automatically above, or paste from GET session response
+POST {{baseUrl}}/interviews/questions/{{questionId}}/answer
+Content-Type: application/json
+
+{
+  "text": "SQL window functions like ROW_NUMBER, RANK, and DENSE_RANK allow calculations across rows related to the current row without collapsing the result set. They are useful for rankings, running totals, and moving averages in data engineering pipelines."
+}
+
+> {%
+  client.log("Answer submitted.");
+  client.log("Evaluation — Overall: " + response.body.evaluation.overall);
+  client.log("Strengths: " + response.body.evaluation.strengths);
+%}
+
+
+###
+
+
+### Generate the next question
+POST {{baseUrl}}/interviews/{{sessionId}}/next-question
+Content-Type: application/json
+
+> {%
+  client.global.set("questionId", response.body.id);
+  client.log("Next question: " + response.body.text);
+  client.log("Question ID: " + response.body.id);
+%}
+
+
+###
+
+
+### Submit another answer
+POST {{baseUrl}}/interviews/questions/{{questionId}}/answer
+Content-Type: application/json
+
+{
+  "text": "An ETL pipeline consists of three phases: Extract data from source systems (databases, APIs, files), Transform it by cleaning, aggregating, and validating, then Load it into the target data warehouse or lake. Tools like Apache Spark, dbt, and Airflow are commonly used."
+}
+
+
+###
+
+
+### Finish session — get overall score and feedback
+POST {{baseUrl}}/interviews/{{sessionId}}/finish
+Content-Type: application/json
+
+> {%
+  client.log("Session finished!");
+  client.log("Overall score: " + response.body.overallScore);
+  client.log("Feedback: " + response.body.overallFeedback);
+%}

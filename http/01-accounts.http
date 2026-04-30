@@ -1,0 +1,36 @@
+### ─────────────────────────────────────────────────────────────────────────
+### ACCOUNTS
+### Base: {{baseUrl}}/accounts
+### Admin endpoints require X-Admin-Key header
+### ─────────────────────────────────────────────────────────────────────────
+
+
+### List all accounts (with embedded roles)
+GET {{baseUrl}}/accounts
+Accept: application/json
+
+> {%
+  // Auto-capture first account ID for use in other requests
+  var accounts = response.body;
+  if (accounts.length > 0) {
+    client.global.set("accountId", accounts[0].id);
+    client.log("Captured accountId: " + accounts[0].id);
+  }
+%}
+
+
+###
+
+
+### Create account with roles (admin only)
+# Note: Use 02-admin.http → POST /admin/accounts-with-roles instead.
+# Standalone account creation was removed; roles must be created together.
+
+
+###
+
+
+### Delete an account (admin only)
+# Replace {{accountId}} with an actual UUID from the list above
+DELETE {{baseUrl}}/accounts/{{accountId}}
+X-Admin-Key: {{adminKey}}
