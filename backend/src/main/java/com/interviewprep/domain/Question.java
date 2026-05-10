@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import java.util.UUID;
 
 @Entity
-@Table(name = "questions")
+@Table(name = "questions", schema = "app")
 public class Question {
 
     @Id @GeneratedValue
@@ -17,8 +17,7 @@ public class Question {
     @Column(nullable = false)
     private int orderIndex;
 
-    @Lob
-    @Column(columnDefinition = "CLOB", nullable = false)
+    @Column(columnDefinition = "TEXT", nullable = false)
     private String text;
 
     @OneToOne(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)

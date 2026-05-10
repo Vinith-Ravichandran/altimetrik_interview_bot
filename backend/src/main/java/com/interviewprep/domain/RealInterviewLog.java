@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Entity
-@Table(name = "real_interview_logs")
+@Table(name = "real_interview_logs", schema = "app")
 public class RealInterviewLog {
 
     @Id @GeneratedValue

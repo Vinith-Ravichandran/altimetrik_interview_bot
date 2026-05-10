@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "documents")
+@Table(name = "documents", schema = "app")
 public class Document {
 
     @Id @GeneratedValue
@@ -34,8 +34,7 @@ public class Document {
     @Column(length = 1000)
     private String tags;
 
-    @Lob
-    @Column(columnDefinition = "CLOB")
+    @Column(columnDefinition = "TEXT")
     private String extractedText;
 
     @Column(nullable = false)

@@ -4,44 +4,58 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.interviewprep.domain.*;
 import com.interviewprep.repository.AccountRepository;
+import com.interviewprep.repository.AppUserRepository;
+import com.interviewprep.repository.BotQuestionRepository;
 import com.interviewprep.repository.InterviewSessionRepository;
 import com.interviewprep.repository.QuestionRepository;
 import com.interviewprep.repository.RoleRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
 public class InterviewService {
 
+    private static final Logger log = LoggerFactory.getLogger(InterviewService.class);
+
     private final InterviewSessionRepository sessionRepository;
-    private final QuestionRepository questionRepository;
-    private final AccountRepository accountRepository;
-    private final RoleRepository roleRepository;
-    private final ClaudeService claudeService;
-    private final VectorSearchService vectorSearchService;
+    private final QuestionRepository         questionRepository;
+    private final AccountRepository          accountRepository;
+    private final RoleRepository             roleRepository;
+    private final AppUserRepository          userRepository;
+    private final BotQuestionRepository      botQuestionRepository;
+    private final ClaudeService              claudeService;
+    private final VectorSearchService        vectorSearchService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public InterviewService(InterviewSessionRepository sessionRepository,
                             QuestionRepository questionRepository,
                             AccountRepository accountRepository,
                             RoleRepository roleRepository,
+                            AppUserRepository userRepository,
+                            BotQuestionRepository botQuestionRepository,
                             ClaudeService claudeService,
                             VectorSearchService vectorSearchService) {
-        this.sessionRepository = sessionRepository;
-        this.questionRepository = questionRepository;
-        this.accountRepository = accountRepository;
-        this.roleRepository = roleRepository;
-        this.claudeService = claudeService;
+        this.sessionRepository   = sessionRepository;
+        this.questionRepository  = questionRepository;
+        this.accountRepository   = accountRepository;
+        this.roleRepository      = roleRepository;
+        this.userRepository      = userRepository;
+        this.botQuestionRepository = botQuestionRepository;
+        this.claudeService       = claudeService;
         this.vectorSearchService = vectorSearchService;
     }
 
     @Transactional
-    public InterviewSession start(UUID accountId, UUID roleId) {
+    public InterviewSession start(UUID accountId, UUID roleId, String callerName) {
         Account account = accountRepository.findById(accountId)
                 .orElseThrow(() -> new IllegalArgumentException("Account not found"));
         Role role = roleRepository.findById(roleId)
@@ -50,6 +64,15 @@ public class InterviewService {
         InterviewSession session = new InterviewSession();
         session.setAccount(account);
         session.setRole(role);
+        // callerName is the JWT subject = user UUID string
+        if (callerName != null) {
+            try {
+                UUID uid = UUID.fromString(callerName);
+                userRepository.findById(uid).ifPresent(session::setUser);
+            } catch (IllegalArgumentException e) {
+                userRepository.findByName(callerName).ifPresent(session::setUser);
+            }
+        }
         sessionRepository.save(session);
 
         Question first = generateNextQuestion(session);
@@ -59,41 +82,68 @@ public class InterviewService {
 
     @Transactional
     public Question generateNextQuestion(InterviewSession session) {
-        String roleName = session.getRole().getName();
+        String roleName    = session.getRole().getName();
+        String accountName = session.getAccount().getName();
 
+        Set<String> alreadyAsked = session.getQuestions().stream()
+                .map(Question::getText)
+                .collect(Collectors.toSet());
+
+        // ── Priority 1: questions from PostgreSQL (uploaded documents) ──────────
+        String questionText = pickFromDatabase(accountName, roleName, alreadyAsked);
+
+        // ── Priority 2: Claude-generated question (fallback) ───────────────────
+        if (questionText == null) {
+            log.info("[INTERVIEW] No DB questions available — generating via Claude for role={}", roleName);
+            questionText = generateViaClaude(session, roleName, accountName, alreadyAsked);
+        } else {
+            log.info("[INTERVIEW] Using question from PostgreSQL for account={} role={}", accountName, roleName);
+        }
+
+        Question q = new Question();
+        q.setSession(session);
+        q.setOrderIndex(session.getQuestions().size());
+        q.setText(questionText);
+        return questionRepository.save(q);
+    }
+
+    /** Picks one unasked question from interview_bot.questions matching account+role. */
+    private String pickFromDatabase(String accountName, String roleName, Set<String> alreadyAsked) {
+        // Try exact account + role match first
+        List<BotQuestion> pool = botQuestionRepository.findByCompanyAndRole(accountName, roleName);
+
+        // Fall back to role-only match (questions tagged with any account)
+        if (pool.isEmpty()) {
+            pool = botQuestionRepository.findByRole(roleName);
+        }
+
+        return pool.stream()
+                .filter(q -> !alreadyAsked.contains(q.getContent()))
+                .map(BotQuestion::getContent)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String generateViaClaude(InterviewSession session, String roleName,
+                                     String accountName, Set<String> alreadyAsked) {
         String context = vectorSearchService.search(roleName, 5).stream()
                 .map(DocumentChunk::getText)
                 .collect(Collectors.joining("\n---\n"));
 
-        String askedSoFar = session.getQuestions().stream()
-                .map(Question::getText)
-                .collect(Collectors.joining("\n- "));
+        String askedSoFar = String.join("\n- ", alreadyAsked);
 
         String system = "You are an expert technical interviewer. Generate ONE clear, role-appropriate interview question. Return only the question text, no preamble.";
         String user = """
                 Role: %s
                 Account: %s
-
-                Reference material from study materials (may be empty):
-                %s
-
-                Already asked:
-                - %s
-
+                Reference material (may be empty): %s
+                Already asked: %s
                 Generate the next unique question for this role. Avoid duplicates.
-                """.formatted(
-                roleName,
-                session.getAccount().getName(),
+                """.formatted(roleName, accountName,
                 context.isBlank() ? "(none)" : context,
                 askedSoFar.isBlank() ? "(none)" : askedSoFar);
 
-        String text = claudeService.complete(system, user).trim();
-
-        Question q = new Question();
-        q.setSession(session);
-        q.setOrderIndex(session.getQuestions().size());
-        q.setText(text);
-        return questionRepository.save(q);
+        return claudeService.complete(system, user).trim();
     }
 
     @Transactional
@@ -178,7 +228,13 @@ public class InterviewService {
                 .orElseThrow(() -> new IllegalArgumentException("Session not found"));
     }
 
+    /** Returns all sessions — admin only. */
     public List<InterviewSession> list() {
         return sessionRepository.findAll();
+    }
+
+    /** Returns only sessions belonging to the given user. */
+    public List<InterviewSession> listByUser(UUID userId) {
+        return sessionRepository.findByUser_Id(userId);
     }
 }

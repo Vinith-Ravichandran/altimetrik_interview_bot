@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "app_users", indexes = {
+@Table(name = "app_users", schema = "app", indexes = {
         @Index(name = "idx_user_name",  columnList = "name"),
         @Index(name = "idx_user_email", columnList = "email")
 })

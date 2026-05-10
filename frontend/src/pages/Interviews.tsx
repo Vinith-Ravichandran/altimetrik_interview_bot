@@ -145,8 +145,16 @@ export default function Interviews() {
     if (!canContinue || !selectedAccount || !selectedRole) return;
     setBusy(true);
     try {
-      const session = await api.startInterview(selectedAccount.id, selectedRole.id);
-      navigate(`/interviews/${session.id}`);
+      // Start a bot interview (DB Questions mode) — uses stored questions
+      const res = await api.startBotInterview(selectedAccount.name, selectedRole.name);
+      navigate("/bot-interview", {
+        state: {
+          sessionId:     res.sessionId,
+          firstQuestion: res.firstQuestion?.content ?? res.firstQuestion,
+          company:       selectedAccount.name,
+          role:          selectedRole.name,
+        },
+      });
     } finally {
       setBusy(false);
     }
@@ -167,6 +175,68 @@ export default function Interviews() {
       </div>
 
       <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
+
+        {/* ── Interview Mode Selection ── */}
+        <section>
+          <h3 className="text-xs font-bold text-purple-700 tracking-widest uppercase mb-4">
+            🎯 Select Interview Mode
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+            {/* Mode 1 */}
+            <div className="bg-white border-2 border-purple-200 rounded-2xl p-6 shadow-card hover:border-purple-400 hover:shadow-lg transition-all group">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-2xl shrink-0">
+                  🗃️
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-slate-900 mb-1">Previously Asked Questions</h3>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Questions from your uploaded documents. LLM evaluates with detailed scores (Clarity, Depth, Quality) and provides a professional improved answer.
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {["DB Questions","Detailed Scoring","Improved Answers","Follow-ups"].map(t => (
+                      <span key={t} className="text-[10px] font-semibold bg-purple-50 text-purple-600 border border-purple-200 px-2 py-0.5 rounded-full">{t}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-slate-400 mt-4">👇 Select account + role below to start this mode</p>
+            </div>
+
+            {/* Mode 2 */}
+            <button
+              type="button"
+              onClick={() => navigate("/tech-stack-interview")}
+              className="bg-white border-2 border-indigo-200 rounded-2xl p-6 shadow-card hover:border-indigo-500 hover:shadow-lg transition-all text-left group"
+            >
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-2xl shrink-0">
+                  ⎈
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-slate-900 mb-1 group-hover:text-indigo-700 transition-colors">
+                    Tech Stack Evaluation
+                  </h3>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Choose SQL, Python, Java, GCP, etc. AI asks questions from Basic → Advanced, adapts to your level, and generates a full skill report at the end.
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {["Adaptive Difficulty","Skill Report","Suggested Topics","Confidence Level"].map(t => (
+                      <span key={t} className="text-[10px] font-semibold bg-indigo-50 text-indigo-600 border border-indigo-200 px-2 py-0.5 rounded-full">{t}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 text-xs font-semibold text-indigo-600 mt-4 group-hover:gap-2 transition-all">
+                Start Tech Stack Evaluation
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
+                </svg>
+              </div>
+            </button>
+          </div>
+        </section>
 
         {/* ── Section 1: Account ── */}
         <section>

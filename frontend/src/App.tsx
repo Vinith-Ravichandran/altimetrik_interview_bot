@@ -8,6 +8,8 @@ import Documents from "./pages/Documents";
 import AccountsRoles from "./pages/AccountsRoles";
 import Interviews from "./pages/Interviews";
 import InterviewSession from "./pages/InterviewSession";
+import TechStackInterview from "./pages/TechStackInterview";
+import BotInterviewSession from "./pages/BotInterviewSession";
 import RealInterviews from "./pages/RealInterviews";
 import UserManagement from "./pages/admin/UserManagement";
 
@@ -44,6 +46,8 @@ function AppRoutes() {
         {/* User routes */}
         <Route path="interviews" element={<Interviews />} />
         <Route path="interviews/:id" element={<InterviewSession />} />
+        <Route path="tech-stack-interview" element={<TechStackInterview />} />
+        <Route path="bot-interview" element={<BotInterviewSession />} />
         <Route path="real-interviews" element={<RealInterviews />} />
 
         {/* Redirect aliases */}

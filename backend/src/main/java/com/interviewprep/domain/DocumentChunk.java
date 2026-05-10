@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import java.util.UUID;
 
 @Entity
-@Table(name = "document_chunks", indexes = {
+@Table(name = "document_chunks", schema = "app", indexes = {
         @Index(name = "idx_chunk_document", columnList = "document_id")
 })
 public class DocumentChunk {

@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import java.util.UUID;
 
 @Entity
-@Table(name = "roles")
+@Table(name = "roles", schema = "app")
 public class Role {
 
     @Id @GeneratedValue

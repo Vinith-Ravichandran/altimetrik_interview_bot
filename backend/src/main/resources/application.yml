@@ -1,26 +1,39 @@
 server:
   port: 8080
 
+logging:
+  level:
+    root: INFO
+    com.interviewprep: DEBUG
+    org.springframework.web: INFO
+    org.hibernate.SQL: WARN
+
 spring:
   application:
     name: interview-prep-backend
+
   datasource:
-    url: jdbc:h2:file:./data/interviewdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:interviewprep}
+    driver-class-name: org.postgresql.Driver
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:admin}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+
   jpa:
     hibernate:
       ddl-auto: update
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.H2Dialect
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        default_schema: app
         format_sql: true
+        hbm2ddl:
+          create_namespaces: true
     show-sql: false
+
   servlet:
     multipart:
       max-file-size: 25MB
@@ -33,6 +46,10 @@ openai:
   base-url: https://api.openai.com
   max-tokens: 2048
 
+claude:
+  api-key: ${CLAUDE_API_KEY:}
+  model: ${CLAUDE_MODEL:claude-haiku-4-5-20251001}
+
 app:
   cors:
     allowed-origins: http://localhost:5173,http://localhost:3000
@@ -40,3 +57,6 @@ app:
   jwt-expiry-ms: ${JWT_EXPIRY_MS:86400000}
   storage:
     path: ${STORAGE_PATH:./uploads}
+  master-pdf:
+    path: ${MASTER_PDF_PATH:./data/master_questions.pdf}
+    json-path: ${MASTER_JSON_PATH:./data/master_questions.json}

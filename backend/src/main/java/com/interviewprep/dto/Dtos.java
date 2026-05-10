@@ -171,4 +171,73 @@ public final class Dtos {
             UUID userId, String name, String roleName, String accountName,
             int mockCount, double avgScore, double highestScore,
             long realInterviews, Instant lastActivity) {}
+
+    /** Personal stats returned for the authenticated user. Computed server-side from their sessions only. */
+    public record UserDashboardDto(
+            int     totalSessions,
+            int     completedSessions,
+            double  avgScore,
+            double  bestScore,
+            String  skillLevel,
+            Double  latestScore,
+            String  latestFeedback,
+            Instant lastActivity) {}
+
+    /** Per-user row in the admin dashboard table. */
+    public record AdminUserRowDto(
+            UUID    userId,
+            String  name,
+            String  roleName,
+            String  accountName,
+            int     totalSessions,
+            int     completedSessions,
+            double  avgScore,
+            double  bestScore,
+            Instant lastActivity) {}
+
+    // ── User analytics panel ──────────────────────────────────────────────────
+
+    public record TechStatDto(String tech, double avgScore, long count, String level) {}
+
+    public record AccountStatDto(String account, long count, double avgScore, String level) {}
+
+    public record SessionSummaryDto(
+            String sessionId,
+            String mode,            // DB_QUESTIONS | TECH_STACK
+            String label,           // role / tech stack name
+            String company,         // account name (Ford, PayPal …)
+            double score,
+            String skillLevel,
+            String startedAt,
+            String completedAt,
+            long   durationMinutes,
+            double avgClarity,
+            double avgDepth,
+            double avgQuality,
+            int    totalQuestions,   // all answers (base + follow-ups)
+            int    answeredQuestions, // answers with non-blank text
+            int    followUpCount     // follow-up questions only
+    ) {}
+
+    public record ScorePointDto(String date, double score, String label) {}
+
+    public record UserAnalyticsDto(
+            // Profile
+            UUID   userId, String name, String email,
+            String roleName, String accountName,
+            boolean admin, boolean active, String memberSince,
+            // Overview
+            int    totalSessions, int completedSessions,
+            int    totalAnswers, int confidentAnswers, int needsImprovement,
+            double overallAvgScore,
+            double avgClarity, double avgDepth, double avgQuality,
+            String bestTech, double bestTechScore,
+            String weakestTech,
+            // Breakdowns
+            List<TechStatDto>      techBreakdown,
+            List<AccountStatDto>   accountBreakdown,
+            List<ScorePointDto>    scoreTrend,
+            List<SessionSummaryDto> recentSessions,
+            // Areas
+            List<String> strongAreas, List<String> weakAreas) {}
 }

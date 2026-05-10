@@ -1,361 +1,269 @@
-# Interview Prep Platform
+# AI Interview Preparation System
 
-An AI-powered interview preparation platform that ingests knowledge from multiple document formats, builds a single source of truth, and runs role- and account-specific mock interviews with automated scoring and feedback.
-
----
-
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Core Features](#core-features)
-3. [Architecture](#architecture)
-4. [Tech Stack](#tech-stack)
-5. [Project Structure](#project-structure)
-6. [Prerequisites](#prerequisites)
-7. [Backend Setup (Spring Boot)](#backend-setup-spring-boot)
-8. [Frontend Setup (React)](#frontend-setup-react)
-9. [Environment Variables](#environment-variables)
-10. [Data Model](#data-model)
-11. [REST API](#rest-api)
-12. [Key Workflows](#key-workflows)
-13. [Question Classification](#question-classification)
-14. [Testing](#testing)
-15. [Roadmap](#roadmap)
+A full-stack AI-powered platform for mock interview practice, document ingestion, and question management.
 
 ---
 
-## Overview
+## Stack
 
-The platform helps candidates prepare for client interviews by:
-
-- **Ingesting** PDFs, Word (`.docx`), legacy Word (`.doc`), and text files into a unified knowledge base.
-- **Exporting** that knowledge back in any supported format on demand (e.g., PDF, DOCX).
-- **Running mock interviews** tailored to a candidate's role and the target account's tech stack.
-- **Evaluating answers** on clarity, depth, and quality using the Claude API.
-- **Capturing real interview questions** after live panels, feeding them back into the knowledge base.
-- **Auto-classifying questions** by role, technology, and sub-service (e.g., `GCP → BigQuery`).
-
----
-
-## Core Features
-
-| # | Feature | Description |
-|---|---------|-------------|
-| 1 | Multi-format ingestion | Upload PDF / DOC / DOCX / TXT; text extracted via Apache Tika |
-| 2 | Single source of truth | Canonical content stored in PostgreSQL with vector embeddings in FAISS |
-| 3 | Format export | Regenerate stored content as PDF (iText) or DOCX (Apache POI) |
-| 4 | Account & role registry | Maintain accounts, their tooling, and target roles |
-| 5 | AI interview bot | Claude-driven question generation grounded in the knowledge base |
-| 6 | Answer evaluation | Score per answer + strengths / improvement summary |
-| 7 | Real-interview capture | Post-interview form to log panelist, account, and asked questions |
-| 8 | Auto-classification | Tags questions by domain → service (e.g., `GCP → Cloud Functions`) |
+| Layer | Technology |
+|-------|-----------|
+| Backend | Spring Boot 3.3 (Java 17) |
+| Frontend | React 18 + Vite + TypeScript + Tailwind CSS |
+| Database | H2 (dev) / PostgreSQL (prod) |
+| LLM — Document extraction | OpenAI `gpt-4o-mini` |
+| LLM — Interview evaluation | Anthropic Claude (`claude-haiku-4-5`) |
+| Text extraction | Apache Tika 2.9 |
+| PDF generation | iText 8 |
 
 ---
 
-## Architecture
+## Where Data Is Stored
 
-```
-┌──────────────┐      REST       ┌───────────────────────┐
-│   React UI   │ ───────────────▶│   Spring Boot API     │
-│ (chat + dash)│ ◀───────────────│   (controllers/svc)   │
-└──────────────┘                 └──────────┬────────────┘
-                                            │
-                    ┌───────────────────────┼───────────────────────┐
-                    ▼                       ▼                       ▼
-             ┌────────────┐          ┌────────────┐          ┌────────────┐
-             │ PostgreSQL │          │   FAISS    │          │ Claude API │
-             │ (truth DB) │          │ (vectors)  │          │   (LLM)    │
-             └────────────┘          └────────────┘          └────────────┘
-                    ▲
-                    │
-             ┌────────────┐
-             │Apache Tika │  ← text extraction on upload
-             └────────────┘
-```
+### 1. User Accounts
 
----
+**Table:** `public.app_users`
 
-## Tech Stack
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID | Primary key |
+| `name` | VARCHAR(255) | Unique, indexed |
+| `email` | VARCHAR(255) | Unique, indexed |
+| `password_hash` | VARCHAR(255) | BCrypt-encoded |
+| `role_name` | VARCHAR(255) | Optional role tag |
+| `account_name` | VARCHAR(255) | Optional account tag |
+| `admin` | BOOLEAN | Default `false` |
+| `active` | BOOLEAN | Default `true` |
+| `mock_count` | INT | Incremented on interview completion |
+| `created_at` | TIMESTAMP | Auto-set on insert |
+| `updated_at` | TIMESTAMP | Auto-set on update |
 
-**Backend**
-- Java 17, Spring Boot 3.x
-- Spring Web (REST), Spring Data JPA, Spring Security (JWT)
-- Apache Tika (text extraction)
-- iText 7 (PDF generation), Apache POI (DOCX)
-- Flyway (DB migrations)
+**Dev database file:** `backend/data/interviewdb.mv.db` (H2 file-based)
 
-**Frontend**
-- React 18 + Vite
-- React Router, TanStack Query
-- Tailwind CSS + shadcn/ui
-- Axios
-
-**AI & Data**
-- Claude API (`claude-opus-4-7` / `claude-sonnet-4-6`)
-- PostgreSQL 15
-- FAISS (via `faiss-cpu` sidecar service or `jfaiss` bindings)
-
-**Dev & Ops**
-- Docker + docker-compose (local stack)
-- Maven (backend), npm (frontend)
-- JUnit 5, Mockito, Testcontainers (backend); Vitest + React Testing Library (frontend)
+**How to inspect (dev):** Open `http://localhost:8080/h2-console`
+- JDBC URL: `jdbc:h2:file:./data/interviewdb;MODE=PostgreSQL`
+- Username: `sa` / Password: *(empty)*
 
 ---
 
-## Project Structure
+### 2. Accounts & Roles
 
-```
-.
-├── backend/                    # Spring Boot app
-│   ├── src/main/java/com/interviewprep
-│   │   ├── api/                # REST controllers
-│   │   ├── service/            # Business logic (ingest, interview, scoring)
-│   │   ├── ai/                 # Claude client + prompt templates
-│   │   ├── vector/             # FAISS client wrapper
-│   │   ├── domain/             # JPA entities
-│   │   ├── repository/         # Spring Data repositories
-│   │   ├── export/             # PDF/DOCX generators
-│   │   └── config/             # Security, CORS, beans
-│   ├── src/main/resources
-│   │   ├── application.yml
-│   │   └── db/migration/       # Flyway SQL
-│   └── pom.xml
-│
-├── frontend/                   # React app
-│   ├── src
-│   │   ├── pages/              # Dashboard, Interview, Upload, History
-│   │   ├── components/         # Chat UI, question cards, score panels
-│   │   ├── api/                # Axios client + hooks
-│   │   ├── hooks/
-│   │   └── App.tsx
-│   ├── index.html
-│   └── package.json
-│
-├── docker-compose.yml          # Postgres + FAISS sidecar
-└── readme.md
+**Tables:** `public.accounts`, `public.roles`
+
+#### `accounts`
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID | Primary key |
+| `name` | VARCHAR(255) | Company/organisation name |
+| `logo_url` | VARCHAR | Optional logo URL |
+
+#### `roles`
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID | Primary key |
+| `name` | VARCHAR(255) | Role title (e.g. "Data Engineer") |
+| `account_id` | UUID | FK → `accounts.id` |
+
+Accounts and roles are created via the **Accounts & Roles** page (`/accounts-roles`) by admins.
+Existing accounts can be edited (name, logo, add/remove roles) using the **Edit** button per account.
+
+---
+
+### 3. Interview Sessions
+
+**Table:** `public.interview_sessions`
+
+Stores every mock interview session: start time, completion time, overall score, overall feedback, and the list of questions with answers and evaluations.
+
+Related tables: `public.questions`, `public.answers`, `public.evaluations`
+
+Each session references `account_id` and `role_id` from the selection made before starting.
+
+---
+
+### 4. Uploaded File Records
+
+**Table:** `interview_bot.files` (schema: `interview_bot`)
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID | Primary key |
+| `user_id` | UUID | Uploader reference |
+| `file_name` | VARCHAR | Original filename |
+| `file_path` | VARCHAR | Path on disk (temp, deleted after processing) |
+| `uploaded_at` | TIMESTAMP | Upload timestamp |
+
+Each file uploaded via the Documents page (`/documents`) creates one row here. The physical files are processed then deleted; only the metadata row persists.
+
+---
+
+### 5. Questions
+
+Questions have **two storage locations**:
+
+#### A. JSON Shadow File — machine-readable source of truth
+**File:** `backend/data/master_questions.json`
+
+```json
+[
+  { "question": "What is a clustered index?", "category": "SQL" },
+  { "question": "What is the GIL?",           "category": "Python" }
+]
 ```
 
----
+Written atomically after every upload + deduplication pass. This is what the backend reads for `GET /api/v1/process/questions`.
 
-## Prerequisites
+#### B. Master PDF — human-readable output
+**File:** `backend/data/master_questions.pdf`
 
-- **Java 17+** — install from [adoptium.net](https://adoptium.net)
-- **Maven 3.9+** — install from [maven.apache.org](https://maven.apache.org/download.cgi) or via Chocolatey: `choco install maven`
-- **Node.js 20+ and npm 10+** — install from [nodejs.org](https://nodejs.org)
-- A Claude API key from [console.anthropic.com](https://console.anthropic.com) (optional — app runs without it, but interview/classification calls will return stub responses)
-- Docker Desktop *(only if you want Postgres instead of the default in-memory H2)*
+Organised by category:
+```
+=== SQL ===
+1. What is a clustered index?
+2. Explain window functions.
 
----
-
-## Backend Setup (Spring Boot)
-
-The backend uses an **in-memory H2 database** by default — no Postgres setup required.
-
-```bash
-cd backend
-
-# Optional: set your Claude API key
-#   PowerShell:  $env:CLAUDE_API_KEY="sk-ant-..."
-#   bash:        export CLAUDE_API_KEY=sk-ant-...
-
-mvn spring-boot:run
+=== Python ===
+1. What is the GIL?
 ```
 
-- API: `http://localhost:8080/api/v1/...`
-- H2 console: `http://localhost:8080/h2-console`
-  (JDBC URL: `jdbc:h2:mem:interview`, user `sa`, no password)
+Regenerated on every upload from the JSON shadow. Not used for programmatic access.
 
-If `CLAUDE_API_KEY` is not set, interview/classification endpoints return stub text instead of LLM output — everything else still works.
+#### C. Bot Questions DB Table
+**Table:** `interview_bot.bot_questions`
+
+Stores questions extracted via the Bot Interview pipeline (`POST /api/v1/bot/process/{fileId}`). Used to power live mock interview sessions.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID | Primary key |
+| `content` | TEXT | Question text |
+| `normalized_content` | VARCHAR | Deduplication key |
+| `category` | VARCHAR | SQL, Python, Java, etc. |
+| `company` | VARCHAR | Account/company tag |
+| `role` | VARCHAR | Role tag |
+| `difficulty` | VARCHAR | Easy / Medium / Hard |
+| `created_at` | TIMESTAMP | |
 
 ---
 
-## Frontend Setup (React)
+## Category List
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
+| Category | Description |
+|----------|------------|
+| `SQL` | SQL queries, joins, indexing, optimisation |
+| `Python` | Core Python, OOP, GIL, data structures |
+| `Java` | Java syntax, Spring, multithreading |
+| `BigQuery` | GCP BigQuery, partitioning, clustering |
+| `GCS` | Google Cloud Storage |
+| `Others` | Anything not matching the above |
 
-App runs at `http://localhost:5173`. It expects the backend on `http://localhost:8080` (override via `frontend/.env` → `VITE_API_BASE_URL`).
+---
+
+## API Reference
+
+### Document Processing
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/v1/process/upload` | Public | Upload files, extract + categorise questions, update master PDF |
+| `GET` | `/api/v1/process/questions` | Public | Read all questions from JSON shadow |
+| `GET` | `/api/v1/process/files` | Public | List all uploaded file records |
+
+### Interview Bot
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/v1/bot/upload` | Public | Upload file for bot pipeline |
+| `POST` | `/api/v1/bot/process/{fileId}` | Public | Extract questions, tag with company/role |
+| `GET` | `/api/v1/bot/questions` | Public | List bot questions (filterable by company/role) |
+| `POST` | `/api/v1/bot/interview/start` | Public | Start a mock interview session |
+| `POST` | `/api/v1/bot/interview/answer` | Public | Submit an answer, get score + feedback |
+| `POST` | `/api/v1/bot/interview/end` | Public | End session, get full report |
+
+### Accounts & Roles
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/accounts` | Public | List all accounts with roles |
+| `PATCH` | `/api/v1/accounts/{id}` | Admin | Update account name / logo URL |
+| `POST` | `/api/v1/accounts/{id}/roles` | Admin | Add a new role to an existing account |
+| `DELETE` | `/api/v1/accounts/{id}` | Admin | Delete account and all its roles |
+| `DELETE` | `/api/v1/roles/{id}` | Admin | Delete a single role |
+| `POST` | `/api/v1/admin/accounts-with-roles` | Admin | Create account + roles in one request |
+
+### Auth & Users
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/v1/auth/register` | Public | Register new user, returns JWT |
+| `POST` | `/api/v1/auth/login` | Public | Login, returns JWT |
+| `GET` | `/api/v1/users/me` | JWT | Current user profile |
+| `GET` | `/api/v1/users` | JWT | List all users (admin only in practice) |
+| `PATCH` | `/api/v1/users/{id}/promote` | JWT | Promote to admin |
+| `PATCH` | `/api/v1/users/{id}/deactivate` | JWT | Deactivate user |
+| `PATCH` | `/api/v1/users/{id}/activate` | JWT | Activate user |
+| `DELETE` | `/api/v1/users/{id}` | JWT | Delete user (non-admins only) |
 
 ---
 
 ## Environment Variables
 
-### Backend (`backend/.env`)
-
-| Variable | Example | Purpose |
-|----------|---------|---------|
-| `DB_URL` | `jdbc:postgresql://localhost:5432/interview` | Postgres JDBC URL |
-| `DB_USER` | `interview` | DB username |
-| `DB_PASSWORD` | `interview` | DB password |
-| `CLAUDE_API_KEY` | `sk-ant-...` | Claude API key |
-| `CLAUDE_MODEL` | `claude-opus-4-7` | Model ID |
-| `FAISS_HOST` | `localhost:6333` | FAISS sidecar endpoint |
-| `JWT_SECRET` | `change-me` | Signing key for auth tokens |
-
-### Frontend (`frontend/.env`)
-
-| Variable | Example |
-|----------|---------|
-| `VITE_API_BASE_URL` | `http://localhost:8080` |
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `OPENAI_API_KEY` | Yes (upload) | OpenAI key for document question extraction |
+| `CLAUDE_API_KEY` | Yes (interview) | Anthropic Claude key for interview evaluation |
+| `JWT_SECRET` | Recommended | 32+ char secret for signing JWTs |
+| `MASTER_PDF_PATH` | No | Override default `./data/master_questions.pdf` |
+| `MASTER_JSON_PATH` | No | Override default `./data/master_questions.json` |
 
 ---
 
-## Data Model
+## Running Locally
 
-Simplified ERD:
-
-```
-User ──┬── InterviewSession ── Question ── Answer ── Evaluation
-       │
-       └── RealInterviewLog
-Account ── TechnologyStack
-Document ── DocumentChunk (vector_id → FAISS)
-QuestionTag (domain, service)
-```
-
-Key tables:
-
-- `documents` — uploaded source files (metadata + extracted text)
-- `document_chunks` — chunked text with FAISS vector IDs
-- `accounts` — client accounts + their tool stacks
-- `roles` — target roles (e.g., Data Engineer, Cloud Architect)
-- `interview_sessions` — one per mock interview
-- `questions` / `answers` / `evaluations`
-- `real_interview_logs` — panelist-captured questions
-- `question_tags` — `(domain, service)` e.g., `('GCP', 'BigQuery')`
-
----
-
-## REST API
-
-Base path: `/api/v1`
-
-### Documents
-| Method | Path | Description |
-|--------|------|-------------|
-| POST   | `/documents` | Upload a file (multipart) |
-| GET    | `/documents` | List documents |
-| GET    | `/documents/{id}/export?format=pdf\|docx` | Export content |
-
-### Accounts & Roles
-| Method | Path | Description |
-|--------|------|-------------|
-| GET/POST | `/accounts` | List / create accounts |
-| PUT    | `/accounts/{id}/stack` | Update tech stack |
-| GET    | `/roles` | List supported roles |
-
-### Interviews
-| Method | Path | Description |
-|--------|------|-------------|
-| POST   | `/interviews` | Start session `{roleId, accountId}` |
-| POST   | `/interviews/{id}/answers` | Submit an answer (streamed) |
-| GET    | `/interviews/{id}/report` | Final score + feedback |
-
-### Real Interview Capture
-| Method | Path | Description |
-|--------|------|-------------|
-| POST   | `/real-interviews` | Log `{accountId, panelist, questions[]}` |
-
----
-
-## Key Workflows
-
-### 1. Document Ingestion
-```
-User upload → POST /documents
-  → Tika extracts text
-  → Chunk + persist to document_chunks
-  → Generate embeddings (Claude / local model)
-  → Index in FAISS
-```
-
-### 2. Format Export
-```
-GET /documents/{id}/export?format=pdf
-  → Fetch canonical text
-  → iText renders PDF (or POI for DOCX)
-  → Stream file response
-```
-
-### 3. Mock Interview
-```
-POST /interviews {roleId, accountId}
-  → Resolve account tech stack
-  → Vector-search relevant chunks
-  → Claude generates N questions grounded in retrieved context
-  → User answers via chat (WebSocket or SSE)
-  → Claude evaluates each answer (clarity / depth / quality)
-  → Persist score + feedback
-  → GET /interviews/{id}/report returns strengths & gaps
-```
-
-### 4. Real Interview Capture
-```
-POST /real-interviews
-  → Persist raw log
-  → Auto-classify each question (see below)
-  → Create QuestionTag rows
-  → Feed into knowledge base for future mocks
-```
-
----
-
-## Question Classification
-
-Each captured question is sent to Claude with a taxonomy prompt that returns:
-
-```json
-{
-  "domain": "GCP",
-  "service": "BigQuery",
-  "difficulty": "medium",
-  "role_fit": ["Data Engineer", "Analytics Engineer"]
-}
-```
-
-Taxonomy is stored in `question_tags` and drives:
-
-- Filtering in the dashboard
-- Stack-aware question retrieval during mock interviews
-- Analytics (e.g., "70% of questions for Account X are GCP-related")
-
----
-
-## Testing
-
-**Backend**
 ```bash
+# Backend
 cd backend
-./mvnw test
-```
-- Unit: service + domain logic (JUnit 5, Mockito)
-- Integration: repository + API layer (Testcontainers for Postgres)
+export OPENAI_API_KEY=sk-proj-...
+export CLAUDE_API_KEY=sk-ant-...
+./mvnw spring-boot:run          # http://localhost:8080
 
-**Frontend**
-```bash
+# Frontend (separate terminal)
 cd frontend
-npm run test
+npm install
+npm run dev                     # http://localhost:5173
 ```
-- Component tests (Vitest + React Testing Library)
-- API hook tests with MSW
+
+H2 Console (dev): `http://localhost:8080/h2-console`
+- JDBC URL: `jdbc:h2:file:./data/interviewdb;MODE=PostgreSQL`
+- Username: `sa`, Password: *(empty)*
 
 ---
 
-## Roadmap
+## Data Flows
 
-- [ ] M1 — Document ingestion + export (PDF/DOCX)
-- [ ] M2 — Accounts, roles, tech-stack registry
-- [ ] M3 — Claude-powered mock interview (chat + scoring)
-- [ ] M4 — Real-interview capture + auto-classification
-- [ ] M5 — Dashboard analytics (per account / per domain)
-- [ ] M6 — Multi-user org support + role-based access
-- [ ] M7 — Voice-mode interviews (speech-to-text + TTS)
+### Upload → Questions
+```
+User uploads files (PDF/DOCX/TXT)  →  POST /api/v1/process/upload
+  │
+  ├─ Apache Tika: extract text from each file
+  ├─ Combine all text
+  ├─ OpenAI: extract + categorise questions → [{ question, category }]
+  ├─ Deduplicate:
+  │   Level 1 — exact normalised match
+  │   Level 2 — Jaccard similarity ≥ 0.75
+  ├─ PdfService.mergeAndWrite():
+  │   Read master_questions.json → merge → dedup again
+  │   Write master_questions.json  (source of truth)
+  │   Write master_questions.pdf   (human-readable)
+  └─ Return { totalExtracted, totalUnique, questions[], files[] }
+```
 
----
-
-## License
-
-Internal project — license TBD.
+### Mock Interview
+```
+Select account + role  →  POST /bot/interview/start
+  │  Load up to 10 questions from interview_bot.bot_questions
+  │
+Answer question  →  POST /bot/interview/answer
+  │  Claude evaluates: score 0-10, feedback, next action
+  │  FOLLOW_UP (depth ≤ 3)  or  NEXT_QUESTION
+  │
+End session  →  POST /bot/interview/end
+  └─ Claude generates final report:
+     overall_score, skill_level, strengths[], weaknesses[], category_analysis[]
+```

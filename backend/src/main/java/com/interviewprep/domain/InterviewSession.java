@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Entity
-@Table(name = "interview_sessions", indexes = {
+@Table(name = "interview_sessions", schema = "app", indexes = {
         @Index(name = "idx_session_user",    columnList = "user_id"),
         @Index(name = "idx_session_account", columnList = "account_id")
 })

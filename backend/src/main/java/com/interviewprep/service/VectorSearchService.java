@@ -6,80 +6,74 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * Semantic search over document chunks.
- *
- * Strategy (in priority order):
- *   1. pgvector cosine similarity  — when Voyage AI embeddings are available
- *   2. Keyword LIKE scan            — fallback for dev (H2) or when Voyage key is absent
- */
 @Service
 public class VectorSearchService {
 
     private static final Logger log = LoggerFactory.getLogger(VectorSearchService.class);
 
-    private final JdbcTemplate jdbc;
-    private final DocumentChunkRepository chunkRepository;
-    private final EmbeddingService embeddingService;
+    private final JdbcTemplate             jdbc;
+    private final DocumentChunkRepository  chunkRepository;
+    private final EmbeddingService         embeddingService;
 
     public VectorSearchService(JdbcTemplate jdbc,
                                DocumentChunkRepository chunkRepository,
                                EmbeddingService embeddingService) {
-        this.jdbc = jdbc;
-        this.chunkRepository = chunkRepository;
+        this.jdbc             = jdbc;
+        this.chunkRepository  = chunkRepository;
         this.embeddingService = embeddingService;
     }
 
     /**
-     * Find the top-K most relevant document chunks for a query.
-     *
-     * @param query natural language query
-     * @param topK  number of results to return
+     * Runs OUTSIDE any transaction (NOT_SUPPORTED suspends the caller's TX).
+     * This means no transaction is created for the search itself — so there is
+     * nothing to commit or rollback, and no UnexpectedRollbackException can
+     * propagate back to the caller's transaction if the search fails.
      */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public List<DocumentChunk> search(String query, int topK) {
         if (query == null || query.isBlank()) return List.of();
 
-        float[] embedding = embeddingService.embed(query);
-        if (embedding != null) {
-            try {
-                return vectorSearch(embedding, topK);
-            } catch (Exception e) {
-                log.warn("pgvector search failed, falling back to keyword: {}", e.getMessage());
+        try {
+            float[] embedding = embeddingService.embed(query);
+            if (embedding != null) {
+                try {
+                    return vectorSearch(embedding, topK);
+                } catch (Exception e) {
+                    log.warn("[SEARCH] pgvector failed, falling back to keyword: {}", e.getMessage());
+                }
             }
+            return keywordSearch(query, topK);
+        } catch (Exception e) {
+            log.warn("[SEARCH] Document search failed — continuing without context: {}", e.getMessage());
+            return List.of();
         }
-        return keywordSearch(query, topK);
     }
 
-    // ── pgvector cosine similarity search ─────────────────────────────────────
+    // ── pgvector cosine similarity ────────────────────────────────────────────
 
     private List<DocumentChunk> vectorSearch(float[] embedding, int topK) {
         String vectorLiteral = EmbeddingService.toVectorString(embedding);
-
-        /*
-         * Native pgvector query using cosine distance operator <->.
-         * CAST is required because JDBC binds the string as text.
-         */
         List<UUID> ids = jdbc.query(
-            "SELECT id FROM document_chunks " +
+            "SELECT id FROM app.document_chunks " +
             "WHERE embedding IS NOT NULL " +
-            "ORDER BY embedding <-> CAST(? AS vector) " +
-            "LIMIT ?",
+            "ORDER BY embedding <-> CAST(? AS vector) LIMIT ?",
             (rs, rowNum) -> UUID.fromString(rs.getString("id")),
             vectorLiteral, topK
         );
-
         return ids.stream()
-                .map(id -> chunkRepository.findById(id))
+                .map(chunkRepository::findById)
                 .filter(Optional::isPresent)
                 .map(Optional::get)
                 .collect(Collectors.toList());
     }
 
-    // ── keyword LIKE scan (fallback) ──────────────────────────────────────────
+    // ── keyword ILIKE fallback ────────────────────────────────────────────────
 
     private List<DocumentChunk> keywordSearch(String query, int topK) {
         Set<DocumentChunk> hits = new LinkedHashSet<>();

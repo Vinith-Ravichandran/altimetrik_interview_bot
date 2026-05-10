@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import java.util.UUID;
 
 @Entity
-@Table(name = "real_interview_questions")
+@Table(name = "real_interview_questions", schema = "app")
 public class RealInterviewQuestion {
 
     @Id @GeneratedValue
@@ -14,8 +14,7 @@ public class RealInterviewQuestion {
     @JoinColumn(name = "log_id")
     private RealInterviewLog log;
 
-    @Lob
-    @Column(columnDefinition = "CLOB", nullable = false)
+    @Column(columnDefinition = "TEXT", nullable = false)
     private String text;
 
     private String domain;

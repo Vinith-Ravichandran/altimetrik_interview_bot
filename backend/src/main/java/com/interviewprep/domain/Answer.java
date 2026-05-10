@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "answers")
+@Table(name = "answers", schema = "app")
 public class Answer {
 
     @Id @GeneratedValue
@@ -15,8 +15,7 @@ public class Answer {
     @JoinColumn(name = "question_id")
     private Question question;
 
-    @Lob
-    @Column(columnDefinition = "CLOB", nullable = false)
+    @Column(columnDefinition = "TEXT", nullable = false)
     private String text;
 
     @Column(nullable = false)

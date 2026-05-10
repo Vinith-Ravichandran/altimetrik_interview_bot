@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "chat_messages", indexes = {
+@Table(name = "chat_messages", schema = "app", indexes = {
         @Index(name = "idx_msg_session", columnList = "session_id")
 })
 public class ChatMessage {
@@ -23,8 +23,7 @@ public class ChatMessage {
     @Column(nullable = false, length = 20)
     private Role role;
 
-    @Lob
-    @Column(columnDefinition = "CLOB", nullable = false)
+    @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
 
     @Column(length = 50)
